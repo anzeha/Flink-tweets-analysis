@@ -19,6 +19,7 @@
 package com.habjan;
 
 import com.habjan.model.Tweet;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.formats.avro.registry.confluent.ConfluentRegistryAvroDeserializationSchema;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -49,9 +50,13 @@ public class StreamingJob {
 		Properties properties = new Properties();
 		properties.setProperty("bootstrap.servers", "localhost:9092");
 		properties.setProperty("group.id", "com.habjan");
-		/*DataStreamSource<Tweet> stream = env
-				.addSource(new FlinkKafkaConsumer<Tweet>("tweets", ConfluentRegistryAvroDeserializationSchema.forSpecific(Tweet.class ,
-						"http://localhost:8081"), properties).setStartFromEarliest());*/
+		//properties.setProperty("value-converter", "org.apache.kafka.connect.storage.StringConverter");
+		DataStreamSource<Tweet> stream = env.addSource(
+				new FlinkKafkaConsumer<>(
+						"tweets",
+						new AvroDeserializer("http://localhost:8081", Tweet.class),
+						properties).setStartFromLatest());
+		stream.print();
 		/*
 		 * Here, you can start creating your execution plan for Flink.
 		 *
