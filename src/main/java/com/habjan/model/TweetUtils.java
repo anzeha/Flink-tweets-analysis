@@ -27,4 +27,10 @@ public class TweetUtils {
                 = DateTimeFormatter.ofPattern("EEE MMM dd HH:mm:ss X uuuu", Locale.ROOT);
         return OffsetDateTime.parse(twitterTS, dtf).toInstant().toString();
     }
+
+    public static long ConvertToEpoch(String twitterTS){
+        DateTimeFormatter dtf
+                = DateTimeFormatter.ofPattern("EEE MMM dd HH:mm:ss X uuuu", Locale.ROOT);
+        return OffsetDateTime.parse(twitterTS, dtf).toInstant().toEpochMilli();
+    }
 }
