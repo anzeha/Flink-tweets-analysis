@@ -17,3 +17,5 @@ target/
 dependency-reduced-pom.xml
 
 src/main/java/com/habjan/tweets.csv
+tweet_searcher/.env
+tweet_searcher/log.txt

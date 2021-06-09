@@ -1,0 +1,43 @@
+{
+    "fields": [
+        {
+            "name": "id",
+            "type": "long"
+        },
+        {
+            "name": "created_at",
+            "type": "string"
+        },
+        {
+            "name": "user_id",
+            "type": "long"
+        },
+        {
+            "name": "username",
+            "type": "string"
+        },
+        {
+            "name": "text",
+            "type": "string"
+        },
+        {
+            "name": "quote_count",
+            "type": "int"
+        },
+        {
+            "name": "reply_count",
+            "type": "int"
+        },
+        {
+            "name": "retweet_count",
+            "type": "int"
+        },
+        {
+            "name": "favorite_count",
+            "type": "int"
+        }
+    ],
+    "namespace": "com.habjan.model",
+    "name": "Tweet",
+    "type": "record"
+}
