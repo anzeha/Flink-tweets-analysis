@@ -70,6 +70,8 @@ public class StreamingJob {
 
     public static String TOPIC_NAME = "tweets_uclfinal";
     public static Boolean WINDOWED = false;
+    public static final int WINDOW_DURATION = 120;
+    public static final int WINDOW_SLIDE = 10;
 
     public static void main(String[] args) throws Exception {
         // set up the streaming execution environment
@@ -83,12 +85,12 @@ public class StreamingJob {
 
 
         FlinkKafkaConsumerBase<Tweet> kafkaData = new FlinkKafkaConsumer<Tweet>(
-                "tweets_uclfinal",
+                TOPIC_NAME,
                 ConfluentRegistryAvroDeserializationSchema.forSpecific(Tweet.class, "http://localhost:8081"),
-                properties).setStartFromTimestamp(1622317410000L);
+                properties).setStartFromTimestamp(1622317140000L);
 
         //If windowed stream assign timestamp and watermark
-        if(WINDOWED){
+        if (WINDOWED) {
             AssignTimestampAndWatermark(kafkaData);
         }
 
@@ -100,20 +102,21 @@ public class StreamingJob {
         //CHELSEA LEICESTER 1621364760000L
         //CHELSEA CITY UCL GOAL START 1622317380000
         //                            1622317410000
+        //CHELSEA CITY UCL INJURY 1622317140000
         List<HttpHost> httpHosts = new ArrayList<>();
         httpHosts.add(new HttpHost("127.0.0.1", 9200, "http"));
 
 
 
         /*--------------CALL RIGHT STREAMING JOB (COMMENT OTHERS)---------------------*/
-        //CsvStreamingJob(stream);
-        WindowedStreamingJob(stream);
+        CsvStreamingJob(stream);
+        //WindowedStreamingJob(stream);
         /*----------------------------------------------------------------------------*/
 
         env.execute("Flink Streaming Java API Skeleton");
     }
 
-    public static void CsvStreamingJob(DataStreamSource<Tweet> stream) {
+    public static void CsvStreamingJob(DataStream<Tweet> stream) {
         stream.map(new MapFunction<Tweet, Tuple2<String, String>>() {
             @Override
             public Tuple2<String, String> map(Tweet tweet) throws Exception {
@@ -128,14 +131,14 @@ public class StreamingJob {
                 if (stringStringTuple2.f1.startsWith("rt")) return false;
                 else return true;
             }
-        }).writeAsCsv("file:///home/anze/csv/tweets.csv");
+        }).writeAsCsv("file:///home/anze/csv/tweetsInjury.csv");
     }
 
     public static void WindowedStreamingJob(DataStream<Tweet> stream) {
-        stream.windowAll(SlidingEventTimeWindows.of(Time.seconds(500), Time.seconds(100))).process(new ProcessAllWindowFunction());
+        stream.windowAll(SlidingEventTimeWindows.of(Time.seconds(WINDOW_DURATION), Time.seconds(WINDOW_SLIDE))).process(new ProcessAllWindowFunction());
     }
 
-    public static void AssignTimestampAndWatermark(FlinkKafkaConsumerBase<Tweet> kafkaData){
+    public static void AssignTimestampAndWatermark(FlinkKafkaConsumerBase<Tweet> kafkaData) {
         WatermarkStrategy<Tweet> wmStrategy =
                 WatermarkStrategy
                         .<Tweet>forMonotonousTimestamps()
@@ -144,12 +147,12 @@ public class StreamingJob {
         kafkaData.assignTimestampsAndWatermarks(wmStrategy);
     }
 
-    public static void ParseArgs(String[] args){
-        for(int i = 0; i< args.length; i++){
-            if(i == 0 && args[i].equals("W")){
+    public static void ParseArgs(String[] args) {
+        for (int i = 0; i < args.length; i++) {
+            if (i == 0 && args[i].equals("W")) {
                 WINDOWED = true;
             }
-            if(i == 1){
+            if (i == 1) {
                 TOPIC_NAME = args[i];
             }
         }

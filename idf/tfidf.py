@@ -6,8 +6,14 @@ nltk.download('stopwords')
 from nltk.corpus import stopwords
 
 tweets = pd.read_csv("./tweets.csv")
-print(tweets.shape)
-corpus = tweets.iloc[25000:26000, 1].array
+tweetsInjury = pd.read_csv("./tweetsInjury.csv")
+
+print(tweetsInjury.iloc[1000:2000])
+#CORPUS GOAL
+corpus = tweets.iloc[1:2000, 1].array
+#CORPUS INJURJY
+##corpus = tweetsInjury.iloc[1000:2000, 1].array
+
 
 
 #instantiate CountVectorizer() 
@@ -16,7 +22,6 @@ cv=CountVectorizer(stop_words=stopwords.words('english'), max_features=200, max_
 # this steps generates word counts for the words in your docs 
 word_count_vector=cv.fit_transform(corpus)
 
-print(word_count_vector)
 
 tfidf_transformer=TfidfTransformer(smooth_idf=True,use_idf=True) 
 tfidf_transformer.fit(word_count_vector)
@@ -25,7 +30,9 @@ tfidf_transformer.fit(word_count_vector)
 df_idf = pd.DataFrame(tfidf_transformer.idf_, index=cv.get_feature_names(),columns=["idf_weights"]) 
  
 # sort ascending 
-print(df_idf.sort_values(by=['idf_weights'], ascending=True)) 
+weigths = df_idf.sort_values(by=['idf_weights'], ascending=True)
+print(weigths) 
+print(weigths.iloc[0:20]) 
 
 
 """ tfidf_vectorizer = TfidfVectorizer(max_features=200, max_df=0.7, stop_words=stopwords.words('english')) 
