@@ -34,7 +34,6 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
-import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
@@ -69,10 +68,14 @@ import java.util.*;
  */
 public class StreamingJob {
 
+    public static String TOPIC_NAME = "tweets_uclfinal";
+    public static Boolean WINDOWED = false;
+
     public static void main(String[] args) throws Exception {
         // set up the streaming execution environment
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
+        ParseArgs(args);
 
         Properties properties = new Properties();
         properties.setProperty("bootstrap.servers", "localhost:9092");
@@ -84,57 +87,13 @@ public class StreamingJob {
                 ConfluentRegistryAvroDeserializationSchema.forSpecific(Tweet.class, "http://localhost:8081"),
                 properties).setStartFromTimestamp(1622317410000L);
 
-        WatermarkStrategy<Tweet> wmStrategy =
-                WatermarkStrategy
-                        .<Tweet>forMonotonousTimestamps()
-                        .withTimestampAssigner((event, timestamp) -> TweetUtils.ConvertToEpoch(event.getCreatedAt().toString()));
-
-        kafkaData.assignTimestampsAndWatermarks(wmStrategy);
+        //If windowed stream assign timestamp and watermark
+        if(WINDOWED){
+            AssignTimestampAndWatermark(kafkaData);
+        }
 
         DataStream<Tweet> stream = env.addSource(kafkaData);
 
-        /*stream.keyBy(value -> value.getId()).window(SlidingEventTimeWindows.of(Time.seconds(500), Time.seconds(100))).process(new ProcessWindowFunction<Tweet, Tweet, Long, TimeWindow>() {
-            @Override
-            public void process(Long aLong, Context context, Iterable<Tweet> iterable, Collector<Tweet> collector) throws Exception {
-                System.out.println(aLong);
-                System.out.println("---------Window start------------");
-                System.out.println(context.window().toString());
-                iterable.forEach((tweet -> {
-
-                    System.out.println(tweet.getId());
-                    System.out.println(tweet.getCreatedAt());
-                }));
-                System.out.println("---------Window stop------------");
-            }
-        });*/
-
-        stream.windowAll(SlidingEventTimeWindows.of(Time.seconds(500), Time.seconds(100))).process(new ProcessAllWindowFunction<Tweet, Object, TimeWindow>() {
-            @Override
-            public void process(Context context, Iterable<Tweet> iterable, Collector<Object> collector) throws Exception {
-
-                System.out.println("---------Window start------------");
-                System.out.println(context.window().toString());
-                iterable.forEach((tweet -> {
-
-                    System.out.println(tweet.getId());
-                    System.out.println(tweet.getCreatedAt());
-                }));
-                System.out.println("---------Window stop------------");
-            }
-        });
-
-        /*DataStream<Tweet> stream = env.addSource(
-                kafkaData.assignTimestampsAndWatermarks(wmStrategy)).keyBy(value -> value.getId()).window(SlidingEventTimeWindows.of(Time.seconds(60), Time.seconds(10))).apply(new WindowFunction<Tweet, Tweet, Long, TimeWindow>() {
-            @Override
-            public void apply(Long aLong, TimeWindow timeWindow, Iterable<Tweet> iterable, Collector<Tweet> collector) throws Exception {
-
-            }
-        });*/
-        /*DataStreamSource<Tweet> stream = env.addSource(
-                new FlinkKafkaConsumer<>(
-                        "tweets_uclfinal",
-                        ConfluentRegistryAvroDeserializationSchema.forSpecific(Tweet.class, "http://localhost:8081"),
-                        properties).setStartFromTimestamp(1622317410000L));*/
 
         //LEICESTER NEWCASTLE: 1620412200000L
         //ARSENAL CHELSEA: 1619990100000L
@@ -144,21 +103,13 @@ public class StreamingJob {
         List<HttpHost> httpHosts = new ArrayList<>();
         httpHosts.add(new HttpHost("127.0.0.1", 9200, "http"));
 
-        // use a ElasticsearchSink.Builder to create an ElasticsearchSink
-        /*ElasticsearchSink.Builder<Tweet> esSinkBuilder = new ElasticsearchSink.Builder<>(
-                httpHosts,
-                new ElasticSearchSinkFunction("tweets_chelei")
-        );
-
-        esSinkBuilder.setBulkFlushMaxActions(1);*/
 
 
-        // finally, build and add the sink to the job's pipeline
-        //stream.addSink(esSinkBuilder.build());
-
-        // execute program
-
+        /*--------------CALL RIGHT STREAMING JOB (COMMENT OTHERS)---------------------*/
         //CsvStreamingJob(stream);
+        WindowedStreamingJob(stream);
+        /*----------------------------------------------------------------------------*/
+
         env.execute("Flink Streaming Java API Skeleton");
     }
 
@@ -167,12 +118,6 @@ public class StreamingJob {
             @Override
             public Tuple2<String, String> map(Tweet tweet) throws Exception {
                 Tuple2<String, String> t = new Tuple2<String, String>();
-                //String text = tweet.getText().toString();
-                //text = text.replaceAll("\\W", " ");
-                //text = text.replaceAll("\\s+[a-zA-Z]\\s+", " ");
-                //text = text.replaceAll("\\s+", " " );
-                //text = text.replaceAll("\\b(g+o+a*l+)+", "goal");
-                //text = text.toLowerCase();
                 t.f0 = tweet.getCreatedAt().toString();
                 t.f1 = PreprocessUtils.CleanGoalTweet(PreprocessUtils.CleanTweet(tweet.getText().toString()));
                 return t;
@@ -184,6 +129,30 @@ public class StreamingJob {
                 else return true;
             }
         }).writeAsCsv("file:///home/anze/csv/tweets.csv");
+    }
+
+    public static void WindowedStreamingJob(DataStream<Tweet> stream) {
+        stream.windowAll(SlidingEventTimeWindows.of(Time.seconds(500), Time.seconds(100))).process(new ProcessAllWindowFunction());
+    }
+
+    public static void AssignTimestampAndWatermark(FlinkKafkaConsumerBase<Tweet> kafkaData){
+        WatermarkStrategy<Tweet> wmStrategy =
+                WatermarkStrategy
+                        .<Tweet>forMonotonousTimestamps()
+                        .withTimestampAssigner((event, timestamp) -> TweetUtils.ConvertToEpoch(event.getCreatedAt().toString()));
+
+        kafkaData.assignTimestampsAndWatermarks(wmStrategy);
+    }
+
+    public static void ParseArgs(String[] args){
+        for(int i = 0; i< args.length; i++){
+            if(i == 0 && args[i].equals("W")){
+                WINDOWED = true;
+            }
+            if(i == 1){
+                TOPIC_NAME = args[i];
+            }
+        }
     }
 
 }
