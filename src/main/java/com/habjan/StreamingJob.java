@@ -18,6 +18,7 @@
 
 package com.habjan;
 
+import akka.stream.javadsl.Sink;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.habjan.model.Tweet;
@@ -72,6 +73,8 @@ public class StreamingJob {
     public static Boolean WINDOWED = false;
     public static final int WINDOW_DURATION = 120;
     public static final int WINDOW_SLIDE = 10;
+    public static String ES_INDEX_NAME = "tweets_engcro";
+
 
     public static void main(String[] args) throws Exception {
         // set up the streaming execution environment
@@ -87,7 +90,7 @@ public class StreamingJob {
         FlinkKafkaConsumerBase<Tweet> kafkaData = new FlinkKafkaConsumer<Tweet>(
                 TOPIC_NAME,
                 ConfluentRegistryAvroDeserializationSchema.forSpecific(Tweet.class, "http://localhost:8081"),
-                properties).setStartFromTimestamp(1622317140000L);
+                properties).setStartFromEarliest();
 
         //If windowed stream assign timestamp and watermark
         if (WINDOWED) {
@@ -103,14 +106,13 @@ public class StreamingJob {
         //CHELSEA CITY UCL GOAL START 1622317380000
         //                            1622317410000
         //CHELSEA CITY UCL INJURY 1622317140000
-        List<HttpHost> httpHosts = new ArrayList<>();
-        httpHosts.add(new HttpHost("127.0.0.1", 9200, "http"));
 
 
 
         /*--------------CALL RIGHT STREAMING JOB (COMMENT OTHERS)---------------------*/
-        CsvStreamingJob(stream);
+        //CsvStreamingJob(stream);
         //WindowedStreamingJob(stream);
+        SinkToElasticSearch(stream, ESsinkBuilder());
         /*----------------------------------------------------------------------------*/
 
         env.execute("Flink Streaming Java API Skeleton");
@@ -135,7 +137,25 @@ public class StreamingJob {
     }
 
     public static void WindowedStreamingJob(DataStream<Tweet> stream) {
-        stream.windowAll(SlidingEventTimeWindows.of(Time.seconds(WINDOW_DURATION), Time.seconds(WINDOW_SLIDE))).process(new ProcessAllWindowFunction());
+        stream.filter(new FilterFunction<Tweet>() {
+            @Override
+            public boolean filter(Tweet tweet) throws Exception {
+                if(TweetUtils.ConvertToEpoch(tweet.getCreatedAt().toString()) > 1622317140000L) return false;
+                return true;
+            }
+        }).map(new MapFunction<Tweet, Tuple2<String, String>>() {
+                   @Override
+                   public Tuple2<String, String> map(Tweet tweet) throws Exception {
+                       Tuple2<String, String> t = new Tuple2<String, String>();
+                       t.f0 = tweet.getCreatedAt().toString();
+                       t.f1 = PreprocessUtils.CleanGoalTweet(PreprocessUtils.CleanTweet(tweet.getText().toString()));
+                       return t;
+                   }
+        }).windowAll(SlidingEventTimeWindows.of(Time.seconds(WINDOW_DURATION), Time.seconds(WINDOW_SLIDE))).process(new ProcessAllWindowFunction());
+    }
+
+    public static void SinkToElasticSearch(DataStream<Tweet> stream, ElasticsearchSink.Builder<Tweet> esSinkBuilder) {
+        stream.addSink(esSinkBuilder.build());
     }
 
     public static void AssignTimestampAndWatermark(FlinkKafkaConsumerBase<Tweet> kafkaData) {
@@ -145,6 +165,21 @@ public class StreamingJob {
                         .withTimestampAssigner((event, timestamp) -> TweetUtils.ConvertToEpoch(event.getCreatedAt().toString()));
 
         kafkaData.assignTimestampsAndWatermarks(wmStrategy);
+    }
+
+    public static ElasticsearchSink.Builder<Tweet> ESsinkBuilder(){
+        List<HttpHost> httpHosts = new ArrayList<>();
+        httpHosts.add(new HttpHost("127.0.0.1", 9200, "http"));
+
+        // use a ElasticsearchSink.Builder to create an ElasticsearchSink
+        ElasticsearchSink.Builder<Tweet> esSinkBuilder = new ElasticsearchSink.Builder<>(
+                httpHosts,
+                new ElasticSearchSinkFunction(ES_INDEX_NAME)
+        );
+
+        esSinkBuilder.setBulkFlushMaxActions(1);
+
+        return esSinkBuilder;
     }
 
     public static void ParseArgs(String[] args) {

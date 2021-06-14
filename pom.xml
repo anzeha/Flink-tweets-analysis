@@ -81,7 +81,11 @@ under the License.
 
 		<!-- Add connector dependencies here. They must be in the default scope (compile). -->
 
-
+		<dependency>
+			<groupId>com.github.wpm</groupId>
+			<artifactId>tfidf</artifactId>
+			<version>1.0.0</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.apache.flink</groupId>

@@ -1,59 +1,42 @@
 package com.habjan;
 
+import com.github.wpm.tfidf.TfIdf;
 import com.habjan.model.Tweet;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.*;
 
-public class ProcessAllWindowFunction extends org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction<Tweet, Object, TimeWindow> {
+import static com.github.wpm.tfidf.ngram.NgramTfIdf.ngramDocumentTerms;
+import static com.github.wpm.tfidf.ngram.NgramTfIdf.termStatistics;
+
+public class ProcessAllWindowFunction extends org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction<Tuple2<String, String>, Object, TimeWindow> {
+
+
     @Override
-    public void process(Context context, Iterable<Tweet> iterable, Collector<Object> collector) throws Exception {
+    public void process(Context context, Iterable<Tuple2<String, String>> iterable, Collector<Object> collector) throws Exception {
         System.out.println("---------Window start------------");
-        System.out.println(context.window().toString());
+        List<String> text = new ArrayList<String>();
         iterable.forEach((tweet -> {
-
-            System.out.println(tweet.getId());
-            System.out.println(tweet.getCreatedAt());
+            text.add(tweet.f1);
         }));
+        //System.out.println(Arrays.toString(text.toArray()));
+        List<Integer> ns = new ArrayList<Integer>();
+        ns.add(1);
+
+        Iterable<Collection<String>> documents = ngramDocumentTerms(ns, text);
+        Iterable<Map<String, Double>> tfs = TfIdf.tfs(documents);
+        Map<String, Double> idf = TfIdf.idfFromTfs(tfs, false, false);
+        System.out.println("IDF\n" + termStatistics(idf));
+
         System.out.println("---------Window stop------------");
-        String s = null;
-
-        try {
-
-            // run the Unix "ps -ef" command
-            // using the Runtime exec method:
-            Process p = Runtime.getRuntime().exec("echo hello");
-
-            BufferedReader stdInput = new BufferedReader(new
-                    InputStreamReader(p.getInputStream()));
-
-            BufferedReader stdError = new BufferedReader(new
-                    InputStreamReader(p.getErrorStream()));
-
-            // read the output from the command
-            System.out.println("Here is the standard output of the command:\n");
-            while ((s = stdInput.readLine()) != null) {
-                System.out.println(s);
-            }
-
-            // read any errors from the attempted command
-            System.out.println("Here is the standard error of the command (if any):\n");
-            while ((s = stdError.readLine()) != null) {
-                System.out.println(s);
-            }
-
-            System.exit(0);
-        }
-        catch (IOException e) {
-            System.out.println("exception happened - here's what I know: ");
-            e.printStackTrace();
-            System.exit(-1);
-        }
-        System.out.println(s);
     }
+
 
 
 }
