@@ -10,7 +10,7 @@ body:
   "query": {
     "range": {
       "created_at": {
-        "gte": "2021-06-13T11:45:00+00:00",
+        "gte": "2021-06-13T12:30:00+00:00",
         "lte": "2021-06-13T15:00:00+00:00"
       }
     } 
@@ -26,6 +26,7 @@ body:
 }
 
 
+
 """
 
 def median(l):
@@ -35,7 +36,7 @@ def median(l):
         return (l[half - 1] + l[half]) / 2.0
     return l[half]
 
-f = open("./count.json",)
+f = open("./aggregation.json",)
 
 doc = json.load(f)
 

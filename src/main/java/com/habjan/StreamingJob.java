@@ -90,7 +90,7 @@ public class StreamingJob {
         FlinkKafkaConsumerBase<Tweet> kafkaData = new FlinkKafkaConsumer<Tweet>(
                 TOPIC_NAME,
                 ConfluentRegistryAvroDeserializationSchema.forSpecific(Tweet.class, "http://localhost:8081"),
-                properties).setStartFromTimestamp(1623593690000L);
+                properties).setStartFromTimestamp(1623595850000L);
 
         //If windowed stream assign timestamp and watermark
         if (WINDOWED) {
@@ -108,11 +108,17 @@ public class StreamingJob {
         //CHELSEA CITY UCL INJURY 1622317140000
         //ENGLAND CROATIA EURO GOAL 1623593690000
         //                          1623593770000
+        //ENGLAND CROATIA SUBSTITUTE 1623595070000
+        //                          1623595150000
+        //ENGLAND CROATIA START     1623589190000
+        //                          1623589270000
+        //ENGLAND CROATIA END       1623595850000
+        //                          1623595930000
 
 
 
         /*--------------CALL RIGHT STREAMING JOB (COMMENT OTHERS)---------------------*/
-        CsvStreamingJob(stream, 1623593770000L);
+        CsvStreamingJob(stream, 1623595930000L);
         //WindowedStreamingJob(stream);
         //SinkToElasticSearch(stream, ESsinkBuilder());
         /*----------------------------------------------------------------------------*/
@@ -141,7 +147,7 @@ public class StreamingJob {
                 if(TweetUtils.ConvertToEpoch(stringStringTuple2.f0) > endTimeStamp) return false;
                 return true;
             }
-        }).writeAsCsv("file:///home/anze/csv/tweetsInjury.csv");
+        }).writeAsCsv("file:///home/anze/csv/tweets_engcro_end.csv");
     }
 
     public static void WindowedStreamingJob(DataStream<Tweet> stream) {

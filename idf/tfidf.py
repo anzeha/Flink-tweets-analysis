@@ -7,12 +7,27 @@ from nltk.corpus import stopwords
 
 tweets = pd.read_csv("./tweets.csv")
 tweetsInjury = pd.read_csv("./tweetsInjury.csv")
+tweetsEngCroGoal = pd.read_csv("./tweets_engcro_goal.csv")
+tweetsEngCroSubstitute = pd.read_csv("./tweets_engcro_substitute.csv")
+tweetsEngCroStart = pd.read_csv("./tweets_engcro_start.csv")
+tweetsEngCroeEnd = pd.read_csv("./tweets_engcro_end.csv")
 
-print(tweetsInjury.iloc[1000:2000])
+
+#print(tweetsInjury.iloc[1000:2000])
 #CORPUS GOAL
-corpus = tweets.iloc[1:2000, 1].array
+#corpus = tweets.iloc[1:2000, 1].array
 #CORPUS INJURJY
-##corpus = tweetsInjury.iloc[1000:2000, 1].array
+#corpus = tweetsInjury.iloc[1000:2000, 1].array
+#CORPUS EURO ENGLAD CRATIA GOAL
+#corpus = tweetsEngCroGoal.iloc[:, 1].array
+#CORPUS EURO ENGLAND CRATIA SUBSTITUTE
+#corpus = tweetsEngCroStart.iloc[:, 1].array
+corpus = tweetsEngCroeEnd.iloc[:, 1].array
+
+fixedCorpus = []
+
+for x in corpus:
+    fixedCorpus.append(np.str_(x))
 
 
 
@@ -20,7 +35,7 @@ corpus = tweets.iloc[1:2000, 1].array
 cv=CountVectorizer(stop_words=stopwords.words('english'), max_features=200, max_df=0.7) 
  
 # this steps generates word counts for the words in your docs 
-word_count_vector=cv.fit_transform(corpus)
+word_count_vector=cv.fit_transform(fixedCorpus)
 
 
 tfidf_transformer=TfidfTransformer(smooth_idf=True,use_idf=True) 

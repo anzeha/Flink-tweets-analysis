@@ -20,3 +20,4 @@ src/main/java/com/habjan/tweets.csv
 tweet_searcher/.env
 tweet_searcher/log.txt
 python/count.json
+python/aggregation.json

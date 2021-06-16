@@ -6,6 +6,9 @@ public class PreprocessUtils {
         tweet = tweet.replaceAll("\\s+[a-zA-Z]\\s+", " ");
         tweet = tweet.replaceAll("\\s+", " " );
         tweet = tweet.replaceAll("\\b(g+o+a*l+)+", "goal");
+        //REMOVE URLS
+        tweet = tweet.replaceAll("https?:\\/\\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b([-a-zA-Z0-9()@:%_\\+.~#?&//=]*)", "");
+        tweet = tweet.replaceAll("\\b(http[s]?)*", "");
         tweet = tweet.toLowerCase();
 
         return tweet;
