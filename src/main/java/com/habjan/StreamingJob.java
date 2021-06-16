@@ -90,7 +90,7 @@ public class StreamingJob {
         FlinkKafkaConsumerBase<Tweet> kafkaData = new FlinkKafkaConsumer<Tweet>(
                 TOPIC_NAME,
                 ConfluentRegistryAvroDeserializationSchema.forSpecific(Tweet.class, "http://localhost:8081"),
-                properties).setStartFromEarliest();
+                properties).setStartFromTimestamp(1623593690000L);
 
         //If windowed stream assign timestamp and watermark
         if (WINDOWED) {
@@ -106,19 +106,21 @@ public class StreamingJob {
         //CHELSEA CITY UCL GOAL START 1622317380000
         //                            1622317410000
         //CHELSEA CITY UCL INJURY 1622317140000
+        //ENGLAND CROATIA EURO GOAL 1623593690000
+        //                          1623593770000
 
 
 
         /*--------------CALL RIGHT STREAMING JOB (COMMENT OTHERS)---------------------*/
-        //CsvStreamingJob(stream);
+        CsvStreamingJob(stream, 1623593770000L);
         //WindowedStreamingJob(stream);
-        SinkToElasticSearch(stream, ESsinkBuilder());
+        //SinkToElasticSearch(stream, ESsinkBuilder());
         /*----------------------------------------------------------------------------*/
 
         env.execute("Flink Streaming Java API Skeleton");
     }
 
-    public static void CsvStreamingJob(DataStream<Tweet> stream) {
+    public static void CsvStreamingJob(DataStream<Tweet> stream, long endTimeStamp) {
         stream.map(new MapFunction<Tweet, Tuple2<String, String>>() {
             @Override
             public Tuple2<String, String> map(Tweet tweet) throws Exception {
@@ -132,6 +134,12 @@ public class StreamingJob {
             public boolean filter(Tuple2<String, String> stringStringTuple2) throws Exception {
                 if (stringStringTuple2.f1.startsWith("rt")) return false;
                 else return true;
+            }
+        }).filter(new FilterFunction<Tuple2<String, String>>() {
+            @Override
+            public boolean filter(Tuple2<String, String> stringStringTuple2) throws Exception {
+                if(TweetUtils.ConvertToEpoch(stringStringTuple2.f0) > endTimeStamp) return false;
+                return true;
             }
         }).writeAsCsv("file:///home/anze/csv/tweetsInjury.csv");
     }
