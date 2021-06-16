@@ -132,7 +132,7 @@ public class StreamingJob {
             public Tuple2<String, String> map(Tweet tweet) throws Exception {
                 Tuple2<String, String> t = new Tuple2<String, String>();
                 t.f0 = tweet.getCreatedAt().toString();
-                t.f1 = PreprocessUtils.CleanGoalTweet(PreprocessUtils.CleanTweet(tweet.getText().toString()));
+                t.f1 = PreprocessUtils.CleanForLanguageAnalysis(PreprocessUtils.CleanTweet(tweet.getText().toString()));
                 return t;
             }
         }).filter(new FilterFunction<Tuple2<String, String>>() {
@@ -147,7 +147,7 @@ public class StreamingJob {
                 if(TweetUtils.ConvertToEpoch(stringStringTuple2.f0) > endTimeStamp) return false;
                 return true;
             }
-        }).writeAsCsv("file:///home/anze/csv/tweets_engcro_end.csv");
+        }).writeAsCsv("file:///home/anze/csv/testlanguageprocess.csv");
     }
 
     public static void WindowedStreamingJob(DataStream<Tweet> stream) {

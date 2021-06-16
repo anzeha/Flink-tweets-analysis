@@ -10,7 +10,29 @@ public class PreprocessUtils {
         tweet = tweet.replaceAll("https?:\\/\\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b([-a-zA-Z0-9()@:%_\\+.~#?&//=]*)", "");
         tweet = tweet.replaceAll("\\b(http[s]?)*", "");
         tweet = tweet.toLowerCase();
+        tweet.trim();
+        return tweet;
+    }
 
+    public static String CleanForLanguageAnalysis(String tweet){
+        tweet = tweet.toLowerCase();
+        //MENTIONS
+        tweet = tweet.replaceAll("(@\\w*)", "");
+        //REMOVE HASHTAGS
+        tweet = tweet.replaceAll("#\\w+\\s*", "");
+        //REMOVE ALL SPECIAL CHARS
+        tweet = tweet.replaceAll("\\W", " ");
+        //HTML symbols
+        tweet = tweet.replaceAll("&[a-z]+;", "");
+        //MULTIPLE SPACE WITH ONE SPACE
+        tweet = tweet.replaceAll("\\s+", " " );
+        tweet = tweet.replaceAll("\\b(g+o+a*l+)+", "goal");
+        //REMOVE URLS
+        tweet = tweet.replaceAll("https?:\\/\\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b([-a-zA-Z0-9()@:%_\\+.~#?&//=]*)", "");
+        tweet = tweet.replaceAll("\\b(http[s]?)*", "");
+        //SPECIAL CHARS
+        tweet = tweet.replaceAll("[^a-z\\s\\(\\-:\\)\\\\\\/\\];='#]", "");
+        tweet = tweet.trim();
         return tweet;
     }
 
