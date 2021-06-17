@@ -21,8 +21,13 @@ package com.habjan;
 import akka.stream.javadsl.Sink;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.habjan.model.EsTweet;
 import com.habjan.model.Tweet;
 import com.habjan.model.TweetUtils;
+import opennlp.tools.langdetect.Language;
+import opennlp.tools.langdetect.LanguageDetector;
+import opennlp.tools.langdetect.LanguageDetectorME;
+import opennlp.tools.langdetect.LanguageDetectorModel;
 import org.apache.flink.api.common.eventtime.*;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.FlatMapFunction;
@@ -52,6 +57,7 @@ import org.apache.http.HttpHost;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Requests;
 
+import java.io.File;
 import java.time.Duration;
 import java.util.*;
 
@@ -86,6 +92,13 @@ public class StreamingJob {
         properties.setProperty("bootstrap.servers", "localhost:9092");
         properties.setProperty("group.id", "com.habjan");
 
+        File modelFile = new File("./resources/langdetect-183.bin");
+
+        LanguageDetectorModel trainedModel = new LanguageDetectorModel(modelFile);
+
+        // load the model
+        LanguageDetector languageDetector = new LanguageDetectorME(trainedModel);
+
 
         FlinkKafkaConsumerBase<Tweet> kafkaData = new FlinkKafkaConsumer<Tweet>(
                 TOPIC_NAME,
@@ -96,6 +109,8 @@ public class StreamingJob {
         if (WINDOWED) {
             AssignTimestampAndWatermark(kafkaData);
         }
+
+
 
         DataStream<Tweet> stream = env.addSource(kafkaData);
 
@@ -194,6 +209,25 @@ public class StreamingJob {
         esSinkBuilder.setBulkFlushMaxActions(1);
 
         return esSinkBuilder;
+    }
+
+    public static void AddLanguageRecognition(DataStream<Tweet> stream, LanguageDetector languageDetector){
+        stream.map(new MapFunction<Tweet, EsTweet>() {
+            @Override
+            public EsTweet map(Tweet tweet) throws Exception {
+                Language[] languages = languageDetector.predictLanguages(PreprocessUtils.CleanForLanguageAnalysis(tweet.getText().toString()));
+                EsTweet esTweet = new EsTweet();
+                esTweet.setDetected_language(languages[0].getLang());
+                esTweet.setLanguage_confidence(languages[0].getConfidence());
+                esTweet.setCreated_at(TweetUtils.TwitterTSToElasticTS(tweet.getCreatedAt().toString()));
+                esTweet.setId(tweet.getId());
+                esTweet.setUsername(tweet.getUsername().toString());
+                esTweet.setUser_id(tweet.getUserId());
+                esTweet.setText(tweet.getText().toString());
+                return esTweet;
+            }
+        });
+
     }
 
     public static void ParseArgs(String[] args) {
