@@ -21,3 +21,4 @@ tweet_searcher/.env
 tweet_searcher/log.txt
 python/count.json
 python/aggregation.json
+src/main/resources/langdetect-183.bin

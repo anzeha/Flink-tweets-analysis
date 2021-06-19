@@ -58,6 +58,8 @@ import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Requests;
 
 import java.io.File;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.time.Duration;
 import java.util.*;
 
@@ -92,9 +94,13 @@ public class StreamingJob {
         properties.setProperty("bootstrap.servers", "localhost:9092");
         properties.setProperty("group.id", "com.habjan");
 
-        File modelFile = new File("./resources/langdetect-183.bin");
+        String fileName = "../classes/langdetect-183.bin";
+        StreamingJob job = new StreamingJob();
+        ClassLoader classLoader = job.getClass().getClassLoader();
 
-        LanguageDetectorModel trainedModel = new LanguageDetectorModel(modelFile);
+        File file = new File(classLoader.getResource(fileName).getFile());
+
+        LanguageDetectorModel trainedModel = new LanguageDetectorModel(file);
 
         // load the model
         LanguageDetector languageDetector = new LanguageDetectorME(trainedModel);
@@ -133,7 +139,7 @@ public class StreamingJob {
 
 
         /*--------------CALL RIGHT STREAMING JOB (COMMENT OTHERS)---------------------*/
-        CsvStreamingJob(stream, 1623595930000L);
+        //CsvStreamingJob(stream, 1623595930000L);
         //WindowedStreamingJob(stream);
         //SinkToElasticSearch(stream, ESsinkBuilder());
         /*----------------------------------------------------------------------------*/
@@ -147,7 +153,7 @@ public class StreamingJob {
             public Tuple2<String, String> map(Tweet tweet) throws Exception {
                 Tuple2<String, String> t = new Tuple2<String, String>();
                 t.f0 = tweet.getCreatedAt().toString();
-                t.f1 = PreprocessUtils.CleanForLanguageAnalysis(PreprocessUtils.CleanTweet(tweet.getText().toString()));
+                t.f1 = PreprocessUtils.CleanForLanguageAnalysis(PreprocessUtils.CleanGoalTweet(tweet.getText().toString()));
                 return t;
             }
         }).filter(new FilterFunction<Tuple2<String, String>>() {
@@ -239,6 +245,22 @@ public class StreamingJob {
                 TOPIC_NAME = args[i];
             }
         }
+    }
+
+    private File GetFileFromResource(String fileName) throws URISyntaxException {
+
+        ClassLoader classLoader = getClass().getClassLoader();
+        URL resource = classLoader.getResource(fileName);
+        if (resource == null) {
+            throw new IllegalArgumentException("file not found! " + fileName);
+        } else {
+
+            // failed if files have whitespaces or special characters
+            //return new File(resource.getFile());
+
+            return new File(resource.toURI());
+        }
+
     }
 
 }
