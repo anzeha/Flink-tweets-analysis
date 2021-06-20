@@ -19,6 +19,20 @@ public class TweetUtils {
         json.put("quote_count", tweet.getQuoteCount());
         json.put("reply_count", tweet.getReplyCount());
         json.put("retweet_count", tweet.getRetweetCount());
+
+        return json;
+    }
+
+    public static Map<String, Object> EsTweetToJson(EsTweet esTweet) {
+        Map<String, Object> json = new HashMap<>();
+
+        json.put("id", esTweet.getId());
+        json.put("created_at", esTweet.getCreated_at());
+        json.put("user_id", esTweet.getUser_id());
+        json.put("username", esTweet.getUsername());
+        json.put("text", esTweet.getText());
+        json.put("detected_language", esTweet.getDetected_language());
+        json.put("language_confidence", esTweet.getLanguage_confidence());
         return json;
     }
 

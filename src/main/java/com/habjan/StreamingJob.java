@@ -28,6 +28,8 @@ import opennlp.tools.langdetect.Language;
 import opennlp.tools.langdetect.LanguageDetector;
 import opennlp.tools.langdetect.LanguageDetectorME;
 import opennlp.tools.langdetect.LanguageDetectorModel;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.flink.api.common.eventtime.*;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.FlatMapFunction;
@@ -57,11 +59,15 @@ import org.apache.http.HttpHost;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Requests;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Skeleton for a Flink Streaming Job.
@@ -81,7 +87,7 @@ public class StreamingJob {
     public static Boolean WINDOWED = false;
     public static final int WINDOW_DURATION = 120;
     public static final int WINDOW_SLIDE = 10;
-    public static String ES_INDEX_NAME = "tweets_engcro";
+    public static String ES_INDEX_NAME = "tweets_lan_test";
 
 
     public static void main(String[] args) throws Exception {
@@ -94,11 +100,14 @@ public class StreamingJob {
         properties.setProperty("bootstrap.servers", "localhost:9092");
         properties.setProperty("group.id", "com.habjan");
 
-        String fileName = "../classes/langdetect-183.bin";
-        StreamingJob job = new StreamingJob();
-        ClassLoader classLoader = job.getClass().getClassLoader();
+        InputStream inputStream = StreamingJob.class.getResourceAsStream("/langdetect-183.bin");
 
-        File file = new File(classLoader.getResource(fileName).getFile());
+        File file = File.createTempFile("langdetect-183", ".bin");
+        try {
+            FileUtils.copyInputStreamToFile(inputStream, file);
+        } finally {
+            IOUtils.closeQuietly(inputStream);
+        }
 
         LanguageDetectorModel trainedModel = new LanguageDetectorModel(file);
 
@@ -109,7 +118,7 @@ public class StreamingJob {
         FlinkKafkaConsumerBase<Tweet> kafkaData = new FlinkKafkaConsumer<Tweet>(
                 TOPIC_NAME,
                 ConfluentRegistryAvroDeserializationSchema.forSpecific(Tweet.class, "http://localhost:8081"),
-                properties).setStartFromTimestamp(1623595850000L);
+                properties).setStartFromEarliest();
 
         //If windowed stream assign timestamp and watermark
         if (WINDOWED) {
@@ -119,6 +128,9 @@ public class StreamingJob {
 
 
         DataStream<Tweet> stream = env.addSource(kafkaData);
+
+        DataStream<EsTweet> esStream = MapToEsTweet(stream);
+
 
 
         //LEICESTER NEWCASTLE: 1620412200000L
@@ -141,7 +153,10 @@ public class StreamingJob {
         /*--------------CALL RIGHT STREAMING JOB (COMMENT OTHERS)---------------------*/
         //CsvStreamingJob(stream, 1623595930000L);
         //WindowedStreamingJob(stream);
-        //SinkToElasticSearch(stream, ESsinkBuilder());
+        //ELASTIC SINK
+        AddLanguageRecognition(esStream, languageDetector);
+        esStream.addSink(ESsinkBuilder().build());
+        //ELASTIC SINK
         /*----------------------------------------------------------------------------*/
 
         env.execute("Flink Streaming Java API Skeleton");
@@ -189,7 +204,7 @@ public class StreamingJob {
         }).windowAll(SlidingEventTimeWindows.of(Time.seconds(WINDOW_DURATION), Time.seconds(WINDOW_SLIDE))).process(new ProcessAllWindowFunction());
     }
 
-    public static void SinkToElasticSearch(DataStream<Tweet> stream, ElasticsearchSink.Builder<Tweet> esSinkBuilder) {
+    public static void SinkToElasticSearch(DataStream<EsTweet> stream, ElasticsearchSink.Builder<EsTweet> esSinkBuilder) {
         stream.addSink(esSinkBuilder.build());
     }
 
@@ -202,12 +217,12 @@ public class StreamingJob {
         kafkaData.assignTimestampsAndWatermarks(wmStrategy);
     }
 
-    public static ElasticsearchSink.Builder<Tweet> ESsinkBuilder(){
+    public static ElasticsearchSink.Builder<EsTweet> ESsinkBuilder(){
         List<HttpHost> httpHosts = new ArrayList<>();
         httpHosts.add(new HttpHost("127.0.0.1", 9200, "http"));
 
         // use a ElasticsearchSink.Builder to create an ElasticsearchSink
-        ElasticsearchSink.Builder<Tweet> esSinkBuilder = new ElasticsearchSink.Builder<>(
+        ElasticsearchSink.Builder<EsTweet> esSinkBuilder = new ElasticsearchSink.Builder<EsTweet>(
                 httpHosts,
                 new ElasticSearchSinkFunction(ES_INDEX_NAME)
         );
@@ -217,14 +232,13 @@ public class StreamingJob {
         return esSinkBuilder;
     }
 
-    public static void AddLanguageRecognition(DataStream<Tweet> stream, LanguageDetector languageDetector){
-        stream.map(new MapFunction<Tweet, EsTweet>() {
+    public static DataStream<EsTweet> MapToEsTweet(DataStream<Tweet> stream){
+        DataStream<EsTweet> esStream = stream.map(new MapFunction<Tweet, EsTweet>() {
             @Override
             public EsTweet map(Tweet tweet) throws Exception {
-                Language[] languages = languageDetector.predictLanguages(PreprocessUtils.CleanForLanguageAnalysis(tweet.getText().toString()));
                 EsTweet esTweet = new EsTweet();
-                esTweet.setDetected_language(languages[0].getLang());
-                esTweet.setLanguage_confidence(languages[0].getConfidence());
+                //esTweet.setDetected_language(languages[0].getLang());
+                //esTweet.setLanguage_confidence(languages[0].getConfidence());
                 esTweet.setCreated_at(TweetUtils.TwitterTSToElasticTS(tweet.getCreatedAt().toString()));
                 esTweet.setId(tweet.getId());
                 esTweet.setUsername(tweet.getUsername().toString());
@@ -233,7 +247,25 @@ public class StreamingJob {
                 return esTweet;
             }
         });
+        return esStream;
+    }
 
+    public static void AddLanguageRecognition(DataStream<EsTweet> stream, LanguageDetector languageDetector){
+        stream.map(new MapFunction<EsTweet, EsTweet>() {
+            @Override
+            public EsTweet map(EsTweet esTweet) throws Exception {
+
+                Language[] languages = languageDetector.predictLanguages(PreprocessUtils.CleanForLanguageAnalysis(PreprocessUtils.CleanGoalTweet(esTweet.getText().toString())));
+                esTweet.setDetected_language(languages[0].getLang());
+                esTweet.setLanguage_confidence(languages[0].getConfidence());
+                /*esTweet.setCreated_at(TweetUtils.TwitterTSToElasticTS(tweet.getCreatedAt().toString()));
+                esTweet.setId(tweet.getId());
+                esTweet.setUsername(tweet.getUsername().toString());
+                esTweet.setUser_id(tweet.getUserId());
+                esTweet.setText(tweet.getText().toString());*/
+                return esTweet;
+            }
+        });
     }
 
     public static void ParseArgs(String[] args) {
@@ -245,22 +277,6 @@ public class StreamingJob {
                 TOPIC_NAME = args[i];
             }
         }
-    }
-
-    private File GetFileFromResource(String fileName) throws URISyntaxException {
-
-        ClassLoader classLoader = getClass().getClassLoader();
-        URL resource = classLoader.getResource(fileName);
-        if (resource == null) {
-            throw new IllegalArgumentException("file not found! " + fileName);
-        } else {
-
-            // failed if files have whitespaces or special characters
-            //return new File(resource.getFile());
-
-            return new File(resource.toURI());
-        }
-
     }
 
 }

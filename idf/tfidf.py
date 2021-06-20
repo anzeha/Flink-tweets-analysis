@@ -24,6 +24,8 @@ tweetsEngCroeEnd = pd.read_csv("./tweets_engcro_end.csv")
 #corpus = tweetsEngCroStart.iloc[:, 1].array
 corpus = tweetsEngCroeEnd.iloc[:, 1].array
 
+tweetsEngCroeEnd.iloc[:,1].to_csv("./test.csv", index=False, line_terminator="\r\n", header=["text"])
+
 fixedCorpus = []
 
 for x in corpus:
