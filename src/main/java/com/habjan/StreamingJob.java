@@ -21,6 +21,9 @@ package com.habjan;
 import akka.stream.javadsl.Sink;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.habjan.functions.LanguageRecognitionFunction;
+import com.habjan.functions.NamedEntityRecognitionFunction;
+import com.habjan.functions.TweetToEsTweetMapFunction;
 import com.habjan.model.EsTweet;
 import com.habjan.model.Tweet;
 import com.habjan.model.TweetUtils;
@@ -28,6 +31,13 @@ import opennlp.tools.langdetect.Language;
 import opennlp.tools.langdetect.LanguageDetector;
 import opennlp.tools.langdetect.LanguageDetectorME;
 import opennlp.tools.langdetect.LanguageDetectorModel;
+import opennlp.tools.namefind.NameFinderME;
+import opennlp.tools.namefind.TokenNameFinderModel;
+import opennlp.tools.tokenize.Tokenizer;
+import opennlp.tools.tokenize.TokenizerME;
+import opennlp.tools.tokenize.TokenizerModel;
+import opennlp.tools.tokenize.WhitespaceTokenizer;
+import opennlp.tools.util.Span;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.flink.api.common.eventtime.*;
@@ -59,14 +69,12 @@ import org.apache.http.HttpHost;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Requests;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
@@ -89,6 +97,10 @@ public class StreamingJob {
     public static final int WINDOW_SLIDE = 10;
     public static String ES_INDEX_NAME = "tweets_lan_test";
 
+    private static TokenizerModel tokenizerModel;
+    private static TokenNameFinderModel nerPersonModel;
+    private static  LanguageDetectorModel languageModel;
+
 
     public static void main(String[] args) throws Exception {
         // set up the streaming execution environment
@@ -100,19 +112,11 @@ public class StreamingJob {
         properties.setProperty("bootstrap.servers", "localhost:9092");
         properties.setProperty("group.id", "com.habjan");
 
-        InputStream inputStream = StreamingJob.class.getResourceAsStream("/langdetect-183.bin");
 
-        File file = File.createTempFile("langdetect-183", ".bin");
-        try {
-            FileUtils.copyInputStreamToFile(inputStream, file);
-        } finally {
-            IOUtils.closeQuietly(inputStream);
-        }
+        tokenizerModel = new TokenizerModel(StreamingJob.class.getResource("/en-token.bin"));
+        nerPersonModel = new TokenNameFinderModel(StreamingJob.class.getResource("/en-ner-person.bin"));
+        languageModel = new LanguageDetectorModel(StreamingJob.class.getResource("/langdetect-183.bin"));
 
-        LanguageDetectorModel trainedModel = new LanguageDetectorModel(file);
-
-        // load the model
-        LanguageDetector languageDetector = new LanguageDetectorME(trainedModel);
 
 
         FlinkKafkaConsumerBase<Tweet> kafkaData = new FlinkKafkaConsumer<Tweet>(
@@ -129,9 +133,11 @@ public class StreamingJob {
 
         DataStream<Tweet> stream = env.addSource(kafkaData);
 
-        DataStream<EsTweet> esStream = MapToEsTweet(stream);
-
-
+        DataStream<EsTweet> esStream = stream.map(new TweetToEsTweetMapFunction());
+        /*stream.map(new TweetToEsTweetMapFunction())
+                .map(new LanguageRecognitionFunction(languageModel))
+                .map(new NamedEntityRecognitionFunction(nerPersonModel, tokenizerModel))
+                .print();*/
 
         //LEICESTER NEWCASTLE: 1620412200000L
         //ARSENAL CHELSEA: 1619990100000L
@@ -154,9 +160,12 @@ public class StreamingJob {
         //CsvStreamingJob(stream, 1623595930000L);
         //WindowedStreamingJob(stream);
         //ELASTIC SINK
-        AddLanguageRecognition(esStream, languageDetector);
-        esStream.addSink(ESsinkBuilder().build());
+        //AddLanguageRecognition(esStream, languageDetector);
+        //esStream.addSink(ESsinkBuilder().build());
+
+        //AddNER(esStream, tokenizer, nameFinder);
         //ELASTIC SINK
+        CsvSentimentTraining(esStream);
         /*----------------------------------------------------------------------------*/
 
         env.execute("Flink Streaming Java API Skeleton");
@@ -184,6 +193,30 @@ public class StreamingJob {
                 return true;
             }
         }).writeAsCsv("file:///home/anze/csv/testlanguageprocess.csv");
+    }
+
+    public static void CsvSentimentTraining(DataStream<EsTweet> stream){
+        stream.filter(new FilterFunction<EsTweet>() {
+            @Override
+            public boolean filter(EsTweet tweet) throws Exception {
+                int rand = ThreadLocalRandom.current().nextInt(0, 533000);
+                return rand < 500 ? true : false;
+            }
+        }).map(new MapFunction<EsTweet, Tuple2<String, String>>() {
+            @Override
+            public Tuple2<String, String> map(EsTweet esTweet) throws Exception {
+                Tuple2<String, String> t = new Tuple2<String, String>();
+                t.f0 = esTweet.getCreated_at();
+                t.f1 = PreprocessUtils.CleanForLanguageAnalysis(PreprocessUtils.CleanGoalTweet(esTweet.getText()));
+                return t;
+            }
+        }).filter(new FilterFunction<Tuple2<String, String>>() {
+            @Override
+            public boolean filter(Tuple2<String, String> stringStringTuple2) throws Exception {
+                if (stringStringTuple2.f1.startsWith("rt")) return false;
+                else return true;
+            }
+        }).writeAsCsv("file:///home/anze/csv/sentimenttraining.csv");
     }
 
     public static void WindowedStreamingJob(DataStream<Tweet> stream) {
@@ -232,23 +265,7 @@ public class StreamingJob {
         return esSinkBuilder;
     }
 
-    public static DataStream<EsTweet> MapToEsTweet(DataStream<Tweet> stream){
-        DataStream<EsTweet> esStream = stream.map(new MapFunction<Tweet, EsTweet>() {
-            @Override
-            public EsTweet map(Tweet tweet) throws Exception {
-                EsTweet esTweet = new EsTweet();
-                //esTweet.setDetected_language(languages[0].getLang());
-                //esTweet.setLanguage_confidence(languages[0].getConfidence());
-                esTweet.setCreated_at(TweetUtils.TwitterTSToElasticTS(tweet.getCreatedAt().toString()));
-                esTweet.setId(tweet.getId());
-                esTweet.setUsername(tweet.getUsername().toString());
-                esTweet.setUser_id(tweet.getUserId());
-                esTweet.setText(tweet.getText().toString());
-                return esTweet;
-            }
-        });
-        return esStream;
-    }
+
 
     public static void AddLanguageRecognition(DataStream<EsTweet> stream, LanguageDetector languageDetector){
         stream.map(new MapFunction<EsTweet, EsTweet>() {
@@ -267,6 +284,7 @@ public class StreamingJob {
             }
         });
     }
+
 
     public static void ParseArgs(String[] args) {
         for (int i = 0; i < args.length; i++) {

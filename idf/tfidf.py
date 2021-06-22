@@ -11,6 +11,9 @@ tweetsEngCroGoal = pd.read_csv("./tweets_engcro_goal.csv")
 tweetsEngCroSubstitute = pd.read_csv("./tweets_engcro_substitute.csv")
 tweetsEngCroStart = pd.read_csv("./tweets_engcro_start.csv")
 tweetsEngCroeEnd = pd.read_csv("./tweets_engcro_end.csv")
+tweetsSentimentTraining = pd.read_csv('./sentimenttraining.csv', header=None)
+
+print(tweetsSentimentTraining.count())
 
 
 #print(tweetsInjury.iloc[1000:2000])
@@ -24,7 +27,10 @@ tweetsEngCroeEnd = pd.read_csv("./tweets_engcro_end.csv")
 #corpus = tweetsEngCroStart.iloc[:, 1].array
 corpus = tweetsEngCroeEnd.iloc[:, 1].array
 
-tweetsEngCroeEnd.iloc[:,1].to_csv("./test.csv", index=False, line_terminator="\r\n", header=["text"])
+#tweetsEngCroeEnd.iloc[:,1].to_csv("./test.csv", index=False, line_terminator="\r\n", header=["text"])
+
+
+tweetsSentimentTraining.iloc[:,1].to_csv("./sentimenttraining1.csv", index=False, line_terminator="\r\n", header=["text"])
 
 fixedCorpus = []
 

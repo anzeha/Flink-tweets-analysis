@@ -8,8 +8,14 @@ public class EsTweet {
     String text;
     String detected_language;
     Double language_confidence;
+    String NER;
 
     public EsTweet() {
+    }
+
+    @Override
+    public String toString() {
+        return "NER= " + NER + "\n";
     }
 
     public Double getLanguage_confidence() {
@@ -20,7 +26,15 @@ public class EsTweet {
         this.language_confidence = language_confidence;
     }
 
-    public EsTweet(Long id, String created_at, Long user_id, String username, String text, String detected_language, Double language_confidence) {
+    public String getNER() {
+        return NER;
+    }
+
+    public void setNER(String NER) {
+        this.NER = NER;
+    }
+
+    public EsTweet(Long id, String created_at, Long user_id, String username, String text, String detected_language, Double language_confidence, String NER) {
         this.id = id;
         this.created_at = created_at;
         this.user_id = user_id;
@@ -28,6 +42,7 @@ public class EsTweet {
         this.text = text;
         this.detected_language = detected_language;
         this.language_confidence = language_confidence;
+        this.NER = NER;
     }
 
     public Long getId() {
