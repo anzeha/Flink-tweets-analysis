@@ -18,64 +18,41 @@
 
 package com.habjan;
 
-import akka.stream.javadsl.Sink;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.habjan.functions.LanguageRecognitionFunction;
 import com.habjan.functions.NamedEntityRecognitionFunction;
+import com.habjan.functions.SentimentCategorizerFunction;
 import com.habjan.functions.TweetToEsTweetMapFunction;
 import com.habjan.model.EsTweet;
 import com.habjan.model.Tweet;
 import com.habjan.model.TweetUtils;
+import opennlp.tools.doccat.DoccatFactory;
+import opennlp.tools.doccat.DoccatModel;
+import opennlp.tools.doccat.DocumentCategorizerME;
+import opennlp.tools.doccat.DocumentSampleStream;
 import opennlp.tools.langdetect.Language;
 import opennlp.tools.langdetect.LanguageDetector;
-import opennlp.tools.langdetect.LanguageDetectorME;
 import opennlp.tools.langdetect.LanguageDetectorModel;
-import opennlp.tools.namefind.NameFinderME;
 import opennlp.tools.namefind.TokenNameFinderModel;
-import opennlp.tools.tokenize.Tokenizer;
-import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
-import opennlp.tools.tokenize.WhitespaceTokenizer;
-import opennlp.tools.util.Span;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
+import opennlp.tools.util.*;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.common.eventtime.*;
 import org.apache.flink.api.common.functions.FilterFunction;
-import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.functions.RuntimeContext;
-import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.formats.avro.registry.confluent.ConfluentRegistryAvroDeserializationSchema;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
-import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
-import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
-import org.apache.flink.streaming.api.windowing.assigners.SlidingProcessingTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
-import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
-import org.apache.flink.streaming.connectors.elasticsearch.ElasticsearchSinkFunction;
-import org.apache.flink.streaming.connectors.elasticsearch.RequestIndexer;
 import org.apache.flink.streaming.connectors.elasticsearch7.ElasticsearchSink;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumerBase;
-import org.apache.flink.streaming.runtime.operators.util.AssignerWithPeriodicWatermarksAdapter;
-import org.apache.flink.util.Collector;
 import org.apache.http.HttpHost;
-import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.client.Requests;
 
 import java.io.*;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.stream.Collectors;
 
 /**
  * Skeleton for a Flink Streaming Job.
@@ -96,10 +73,12 @@ public class StreamingJob {
     public static final int WINDOW_DURATION = 120;
     public static final int WINDOW_SLIDE = 10;
     public static String ES_INDEX_NAME = "tweets_lan_test";
+    public static ArrayList<String> PLAYERS = new ArrayList<String>();
 
     private static TokenizerModel tokenizerModel;
     private static TokenNameFinderModel nerPersonModel;
     private static  LanguageDetectorModel languageModel;
+    private static DoccatModel doccatModel;
 
 
     public static void main(String[] args) throws Exception {
@@ -116,7 +95,8 @@ public class StreamingJob {
         tokenizerModel = new TokenizerModel(StreamingJob.class.getResource("/en-token.bin"));
         nerPersonModel = new TokenNameFinderModel(StreamingJob.class.getResource("/en-ner-person.bin"));
         languageModel = new LanguageDetectorModel(StreamingJob.class.getResource("/langdetect-183.bin"));
-
+        TrainModel();
+        ReadPlayersSpecific("eng-cro-players.txt");
 
 
         FlinkKafkaConsumerBase<Tweet> kafkaData = new FlinkKafkaConsumer<Tweet>(
@@ -133,11 +113,12 @@ public class StreamingJob {
 
         DataStream<Tweet> stream = env.addSource(kafkaData);
 
-        DataStream<EsTweet> esStream = stream.map(new TweetToEsTweetMapFunction());
-        /*stream.map(new TweetToEsTweetMapFunction())
+        //DataStream<EsTweet> esStream = stream.map(new TweetToEsTweetMapFunction());
+        stream.map(new TweetToEsTweetMapFunction())
                 .map(new LanguageRecognitionFunction(languageModel))
-                .map(new NamedEntityRecognitionFunction(nerPersonModel, tokenizerModel))
-                .print();*/
+                .map(new NamedEntityRecognitionFunction(nerPersonModel, tokenizerModel, PLAYERS))
+                .map(new SentimentCategorizerFunction(doccatModel))
+                ;//.print();
 
         //LEICESTER NEWCASTLE: 1620412200000L
         //ARSENAL CHELSEA: 1619990100000L
@@ -165,7 +146,7 @@ public class StreamingJob {
 
         //AddNER(esStream, tokenizer, nameFinder);
         //ELASTIC SINK
-        CsvSentimentTraining(esStream);
+        //CsvSentimentTraining(esStream);
         /*----------------------------------------------------------------------------*/
 
         env.execute("Flink Streaming Java API Skeleton");
@@ -206,7 +187,7 @@ public class StreamingJob {
             @Override
             public Tuple2<String, String> map(EsTweet esTweet) throws Exception {
                 Tuple2<String, String> t = new Tuple2<String, String>();
-                t.f0 = esTweet.getCreated_at();
+                t.f0 = esTweet.getCreatedAt();
                 t.f1 = PreprocessUtils.CleanForLanguageAnalysis(PreprocessUtils.CleanGoalTweet(esTweet.getText()));
                 return t;
             }
@@ -273,8 +254,8 @@ public class StreamingJob {
             public EsTweet map(EsTweet esTweet) throws Exception {
 
                 Language[] languages = languageDetector.predictLanguages(PreprocessUtils.CleanForLanguageAnalysis(PreprocessUtils.CleanGoalTweet(esTweet.getText().toString())));
-                esTweet.setDetected_language(languages[0].getLang());
-                esTweet.setLanguage_confidence(languages[0].getConfidence());
+                esTweet.setDetectedLanguage(languages[0].getLang());
+                esTweet.setLanguageConfidence(languages[0].getConfidence());
                 /*esTweet.setCreated_at(TweetUtils.TwitterTSToElasticTS(tweet.getCreatedAt().toString()));
                 esTweet.setId(tweet.getId());
                 esTweet.setUsername(tweet.getUsername().toString());
@@ -285,6 +266,61 @@ public class StreamingJob {
         });
     }
 
+    public static void TrainModel() {
+        InputStreamFactory dataIn = null;
+        try {
+            dataIn = new InputStreamFactory() {
+                public InputStream createInputStream() throws IOException {
+                    return StreamingJob.class.getResourceAsStream("/sentiment-training-model.txt");
+                }
+            };
+            ObjectStream lineStream = new PlainTextByLineStream(dataIn, "UTF-8");
+            ObjectStream sampleStream = new DocumentSampleStream(lineStream);
+            // Specifies the minimum number of times a feature must be seen
+            //int cutoff = 2;
+            //int trainingIterations = 30;
+            doccatModel = DocumentCategorizerME.train("en", sampleStream, TrainingParameters.defaultParams(), new DoccatFactory());
+        } catch (IOException e) {
+            System.out.println("Sentiment training data error");
+            e.printStackTrace();
+        } finally {
+            if (dataIn != null) {
+                System.out.println("InputStreamFactory not created!");
+            }
+        }
+    }
+
+    public static void ReadPlayers(String team1, String team2){
+        InputStream inputStream = StreamingJob.class.getResourceAsStream("/players-dataset.csv");
+        InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
+        String line;
+        try (BufferedReader br =
+                     new BufferedReader(inputStreamReader)) {
+            while((line = br.readLine()) != null){
+                String[] values = line.split(";");
+                if(values[2].equalsIgnoreCase(team1) || values[2].equalsIgnoreCase(team2)){
+                    PLAYERS.add(values[1]);
+                }
+            }
+        } catch (Exception e){
+            System.out.println(e);
+        }
+    }
+
+    public static void ReadPlayersSpecific(String filename){
+        InputStream inputStream = StreamingJob.class.getResourceAsStream("/" + filename);
+        InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
+        String line;
+        try (BufferedReader br =
+                     new BufferedReader(inputStreamReader)) {
+            while((line = br.readLine()) != null){
+                String player = StringUtils.substringBetween(line,":","(");
+                PLAYERS.add(player.trim());
+            }
+        } catch (Exception e){
+            System.out.println(e);
+        }
+    }
 
     public static void ParseArgs(String[] args) {
         for (int i = 0; i < args.length; i++) {

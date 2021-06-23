@@ -1,6 +1,5 @@
 package com.habjan.model;
 
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -27,12 +26,15 @@ public class TweetUtils {
         Map<String, Object> json = new HashMap<>();
 
         json.put("id", esTweet.getId());
-        json.put("created_at", esTweet.getCreated_at());
-        json.put("user_id", esTweet.getUser_id());
+        json.put("created_at", esTweet.getCreatedAt());
+        json.put("user_id", esTweet.getUserId());
         json.put("username", esTweet.getUsername());
         json.put("text", esTweet.getText());
-        json.put("detected_language", esTweet.getDetected_language());
-        json.put("language_confidence", esTweet.getLanguage_confidence());
+        json.put("detected_language", esTweet.getDetectedLanguage());
+        json.put("language_confidence", esTweet.getLanguageConfidence());
+        json.put("sentiment", esTweet.getSentiment());
+        json.put("sentiment_probability", esTweet.getSentimentProbability());
+        json.put("players_mentioned", esTweet.getPlayersMentioned());
         return json;
     }
 

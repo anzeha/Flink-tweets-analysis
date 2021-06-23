@@ -1,16 +1,38 @@
 package com.habjan.model;
 
+import java.util.ArrayList;
+
 public class EsTweet {
     Long id;
-    String created_at;
-    Long user_id;
+    String createdAt;
+    Long userId;
     String username;
     String text;
-    String detected_language;
-    Double language_confidence;
+    String detectedLanguage;
+    Double languageConfidence;
     String NER;
+    String sentiment;
+    Double sentimentProbability;
+    ArrayList<String> playersMentioned;
 
     public EsTweet() {
+        this.playersMentioned = new ArrayList<String>();
+    }
+
+    public String getSentiment() {
+        return sentiment;
+    }
+
+    public void setSentiment(String sentiment) {
+        this.sentiment = sentiment;
+    }
+
+    public Double getSentimentProbability() {
+        return sentimentProbability;
+    }
+
+    public void setSentimentProbability(Double sentimentProbability) {
+        this.sentimentProbability = sentimentProbability;
     }
 
     @Override
@@ -18,12 +40,12 @@ public class EsTweet {
         return "NER= " + NER + "\n";
     }
 
-    public Double getLanguage_confidence() {
-        return language_confidence;
+    public Double getLanguageConfidence() {
+        return languageConfidence;
     }
 
-    public void setLanguage_confidence(Double language_confidence) {
-        this.language_confidence = language_confidence;
+    public void setLanguageConfidence(Double languageConfidence) {
+        this.languageConfidence = languageConfidence;
     }
 
     public String getNER() {
@@ -34,15 +56,26 @@ public class EsTweet {
         this.NER = NER;
     }
 
-    public EsTweet(Long id, String created_at, Long user_id, String username, String text, String detected_language, Double language_confidence, String NER) {
+    public EsTweet(Long id, String createdAt, Long userId, String username, String text, String detectedLanguage, Double languageConfidence, String NER, String sentiment, Double sentimentProbability, ArrayList<String> playersMentioned) {
         this.id = id;
-        this.created_at = created_at;
-        this.user_id = user_id;
+        this.createdAt = createdAt;
+        this.userId = userId;
         this.username = username;
         this.text = text;
-        this.detected_language = detected_language;
-        this.language_confidence = language_confidence;
+        this.detectedLanguage = detectedLanguage;
+        this.languageConfidence = languageConfidence;
         this.NER = NER;
+        this.sentiment = sentiment;
+        this.sentimentProbability = sentimentProbability;
+        this.playersMentioned = playersMentioned;
+    }
+
+    public ArrayList<String> getPlayersMentioned() {
+        return playersMentioned;
+    }
+
+    public void setPlayersMentioned(ArrayList<String> playersMentioned) {
+        this.playersMentioned = playersMentioned;
     }
 
     public Long getId() {
@@ -53,20 +86,20 @@ public class EsTweet {
         this.id = id;
     }
 
-    public String getCreated_at() {
-        return created_at;
+    public String getCreatedAt() {
+        return createdAt;
     }
 
-    public void setCreated_at(String created_at) {
-        this.created_at = created_at;
+    public void setCreatedAt(String createdAt) {
+        this.createdAt = createdAt;
     }
 
-    public Long getUser_id() {
-        return user_id;
+    public Long getUserId() {
+        return userId;
     }
 
-    public void setUser_id(Long user_id) {
-        this.user_id = user_id;
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
     public String getUsername() {
@@ -85,11 +118,11 @@ public class EsTweet {
         this.text = text;
     }
 
-    public String getDetected_language() {
-        return detected_language;
+    public String getDetectedLanguage() {
+        return detectedLanguage;
     }
 
-    public void setDetected_language(String detected_language) {
-        this.detected_language = detected_language;
+    public void setDetectedLanguage(String detectedLanguage) {
+        this.detectedLanguage = detectedLanguage;
     }
 }

@@ -6,8 +6,6 @@ import opennlp.tools.langdetect.Language;
 import opennlp.tools.langdetect.LanguageDetector;
 import opennlp.tools.langdetect.LanguageDetectorME;
 import opennlp.tools.langdetect.LanguageDetectorModel;
-import opennlp.tools.namefind.TokenNameFinder;
-import opennlp.tools.namefind.TokenNameFinderModel;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.configuration.Configuration;
 
@@ -27,8 +25,8 @@ public class LanguageRecognitionFunction extends RichMapFunction<EsTweet, EsTwee
     @Override
     public EsTweet map(EsTweet esTweet) throws Exception {
         Language[] languages = languageDetector.predictLanguages(PreprocessUtils.CleanForLanguageAnalysis(PreprocessUtils.CleanGoalTweet(esTweet.getText().toString())));
-        esTweet.setDetected_language(languages[0].getLang());
-        esTweet.setLanguage_confidence(languages[0].getConfidence());
+        esTweet.setDetectedLanguage(languages[0].getLang());
+        esTweet.setLanguageConfidence(languages[0].getConfidence());
         return esTweet;
     }
 }

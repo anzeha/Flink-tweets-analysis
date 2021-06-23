@@ -9,9 +9,11 @@ import opennlp.tools.tokenize.Tokenizer;
 import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
 import opennlp.tools.util.Span;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.configuration.Configuration;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 
 public class NamedEntityRecognitionFunction extends RichMapFunction<EsTweet, EsTweet> {
@@ -20,10 +22,12 @@ public class NamedEntityRecognitionFunction extends RichMapFunction<EsTweet, EsT
     private final TokenNameFinderModel tokenNameFinderModel;
     private transient Tokenizer tokenizer;
     private final TokenizerModel tokenizerModel;
+    private ArrayList<String> PLAYERS;
 
-    public NamedEntityRecognitionFunction(TokenNameFinderModel tokenNameFinderModel, TokenizerModel tokenizerModel) {
+    public NamedEntityRecognitionFunction(TokenNameFinderModel tokenNameFinderModel, TokenizerModel tokenizerModel, ArrayList<String> PLAYERS) {
         this.tokenNameFinderModel = tokenNameFinderModel;
         this.tokenizerModel = tokenizerModel;
+        this.PLAYERS = PLAYERS;
     }
 
     @Override
@@ -34,21 +38,46 @@ public class NamedEntityRecognitionFunction extends RichMapFunction<EsTweet, EsT
 
     @Override
     public EsTweet map(EsTweet esTweet) throws Exception {
-        String tokens[] = tokenizer.tokenize(PreprocessUtils.CleanForLanguageAnalysis(esTweet.getText()));
-        Span nameSpans[] = nameFinder.find(tokens);
-        String persons = "";
-        String test = "";
+        /*String tokens1[] = tokenizer.tokenize("Harry Kane scores for england Lovely pass by Kyle Walker");
+        String tokens2[] = tokenizer.tokenize("Mike is senior programming manager and Rama is a clerk both are working at Tutorialspoint");
+        System.out.println(Arrays.toString(tokens1));
+        System.out.println(Arrays.toString(tokens2));
+
+        Span nameSpans1[] = nameFinder.find(tokens1);
+        Span nameSpans2[] = nameFinder.find(tokens2);
         //Printing the names and their spans in a sentence
-        for(Span s: nameSpans){
-            System.out.println(s.toString()+"  "+tokens[s.getStart()]);
-            test = s.toString()+"  "+tokens[s.getStart()] + " ";
+        for(Span s: nameSpans1){
+            System.out.println(s.toString()+"  "+tokens1[s.getStart()]);
         }
-        if(nameSpans.length > 0){
-            System.out.println(esTweet.getText());
+        for(Span s: nameSpans2){
+            System.out.println(s.toString()+"  "+tokens2[s.getStart()]);
+        }*/
+        //System.out.println(StringUtils.join(PLAYERS, ", "));
+        String cleanTweetText = PreprocessUtils.CleanForLanguageAnalysis(PreprocessUtils.CleanGoalTweet(esTweet.getText()));
+        ArrayList<String> playersMentioned = new ArrayList<String>();
+        for (String player: PLAYERS) {
+            if(cleanTweetText.indexOf(player.toLowerCase()) > -1){
+                playersMentioned.add(player);
+            } else {
+                String[] playerNames = player.split(" ");
+                if(playerNames.length > 1){
+                    if(cleanTweetText.indexOf(playerNames[1].toLowerCase()) > -1)
+                        playersMentioned.add(player);
+                }
+            }
+            /*for (String name:playerNames) {
+                int index = esTweet.getText().indexOf(name);
+                if(index > 0){
+                    playersMentioned.add(player);
+                    break;
+                }
+            }*/
         }
-        /*for(Span s: nameSpans)
-            persons += s.toString() + " ";*/
-        esTweet.setNER(test);
+        System.out.println("---------------------");
+        System.out.println(StringUtils.join(playersMentioned, ", "));
+        System.out.println("---------------------");
+        esTweet.setPlayersMentioned(playersMentioned);
         return esTweet;
     }
+
 }
