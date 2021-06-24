@@ -18,10 +18,7 @@
 
 package com.habjan;
 
-import com.habjan.functions.LanguageRecognitionFunction;
-import com.habjan.functions.NamedEntityRecognitionFunction;
-import com.habjan.functions.SentimentCategorizerFunction;
-import com.habjan.functions.TweetToEsTweetMapFunction;
+import com.habjan.functions.*;
 import com.habjan.model.EsTweet;
 import com.habjan.model.Tweet;
 import com.habjan.model.TweetUtils;
@@ -115,6 +112,7 @@ public class StreamingJob {
 
         //DataStream<EsTweet> esStream = stream.map(new TweetToEsTweetMapFunction());
         stream.map(new TweetToEsTweetMapFunction())
+                .filter(new FilterRetweetsFunction())
                 .map(new LanguageRecognitionFunction(languageModel))
                 .map(new NamedEntityRecognitionFunction(nerPersonModel, tokenizerModel, PLAYERS))
                 .map(new SentimentCategorizerFunction(doccatModel))

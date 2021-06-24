@@ -54,7 +54,9 @@ public class NamedEntityRecognitionFunction extends RichMapFunction<EsTweet, EsT
         }*/
         //System.out.println(StringUtils.join(PLAYERS, ", "));
         String cleanTweetText = PreprocessUtils.CleanForLanguageAnalysis(PreprocessUtils.CleanGoalTweet(esTweet.getText()));
-        ArrayList<String> playersMentioned = new ArrayList<String>();
+        ArrayList<String> playersMentioned = new ArrayList<String>(
+
+        );
         for (String player: PLAYERS) {
             if(cleanTweetText.indexOf(player.toLowerCase()) > -1){
                 playersMentioned.add(player);
@@ -74,6 +76,7 @@ public class NamedEntityRecognitionFunction extends RichMapFunction<EsTweet, EsT
             }*/
         }
         System.out.println("---------------------");
+        System.out.println(cleanTweetText);
         System.out.println(StringUtils.join(playersMentioned, ", "));
         System.out.println("---------------------");
         esTweet.setPlayersMentioned(playersMentioned);
