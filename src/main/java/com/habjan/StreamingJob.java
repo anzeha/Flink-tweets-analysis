@@ -69,7 +69,7 @@ public class StreamingJob {
     public static Boolean WINDOWED = false;
     public static final int WINDOW_DURATION = 120;
     public static final int WINDOW_SLIDE = 10;
-    public static String ES_INDEX_NAME = "tweets_lan_test";
+    public static String ES_INDEX_NAME = "tweets_engcro";
     public static ArrayList<String> PLAYERS = new ArrayList<String>();
 
     private static TokenizerModel tokenizerModel;
@@ -116,7 +116,8 @@ public class StreamingJob {
                 .map(new LanguageRecognitionFunction(languageModel))
                 .map(new NamedEntityRecognitionFunction(nerPersonModel, tokenizerModel, PLAYERS))
                 .map(new SentimentCategorizerFunction(doccatModel))
-                ;//.print();
+                .addSink(ESsinkBuilder().build());
+                //.print();
 
         //LEICESTER NEWCASTLE: 1620412200000L
         //ARSENAL CHELSEA: 1619990100000L
@@ -139,8 +140,8 @@ public class StreamingJob {
         //CsvStreamingJob(stream, 1623595930000L);
         //WindowedStreamingJob(stream);
         //ELASTIC SINK
-        //AddLanguageRecognition(esStream, languageDetector);
-        //esStream.addSink(ESsinkBuilder().build());
+        //AddLanguageRecognition(esStream, languageDetector)
+        //SinkToElasticSearch(esStream, ESsinkBuilder());
 
         //AddNER(esStream, tokenizer, nameFinder);
         //ELASTIC SINK
@@ -216,10 +217,6 @@ public class StreamingJob {
         }).windowAll(SlidingEventTimeWindows.of(Time.seconds(WINDOW_DURATION), Time.seconds(WINDOW_SLIDE))).process(new ProcessAllWindowFunction());
     }
 
-    public static void SinkToElasticSearch(DataStream<EsTweet> stream, ElasticsearchSink.Builder<EsTweet> esSinkBuilder) {
-        stream.addSink(esSinkBuilder.build());
-    }
-
     public static void AssignTimestampAndWatermark(FlinkKafkaConsumerBase<Tweet> kafkaData) {
         WatermarkStrategy<Tweet> wmStrategy =
                 WatermarkStrategy
@@ -244,25 +241,6 @@ public class StreamingJob {
         return esSinkBuilder;
     }
 
-
-
-    public static void AddLanguageRecognition(DataStream<EsTweet> stream, LanguageDetector languageDetector){
-        stream.map(new MapFunction<EsTweet, EsTweet>() {
-            @Override
-            public EsTweet map(EsTweet esTweet) throws Exception {
-
-                Language[] languages = languageDetector.predictLanguages(PreprocessUtils.CleanForLanguageAnalysis(PreprocessUtils.CleanGoalTweet(esTweet.getText().toString())));
-                esTweet.setDetectedLanguage(languages[0].getLang());
-                esTweet.setLanguageConfidence(languages[0].getConfidence());
-                /*esTweet.setCreated_at(TweetUtils.TwitterTSToElasticTS(tweet.getCreatedAt().toString()));
-                esTweet.setId(tweet.getId());
-                esTweet.setUsername(tweet.getUsername().toString());
-                esTweet.setUser_id(tweet.getUserId());
-                esTweet.setText(tweet.getText().toString());*/
-                return esTweet;
-            }
-        });
-    }
 
     public static void TrainModel() {
         InputStreamFactory dataIn = null;

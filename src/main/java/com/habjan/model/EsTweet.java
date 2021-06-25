@@ -10,7 +10,6 @@ public class EsTweet {
     String text;
     String detectedLanguage;
     Double languageConfidence;
-    String NER;
     String sentiment;
     Double sentimentProbability;
     ArrayList<String> playersMentioned;
@@ -35,10 +34,6 @@ public class EsTweet {
         this.sentimentProbability = sentimentProbability;
     }
 
-    @Override
-    public String toString() {
-        return "NER= " + NER + "\n";
-    }
 
     public Double getLanguageConfidence() {
         return languageConfidence;
@@ -48,13 +43,6 @@ public class EsTweet {
         this.languageConfidence = languageConfidence;
     }
 
-    public String getNER() {
-        return NER;
-    }
-
-    public void setNER(String NER) {
-        this.NER = NER;
-    }
 
     public EsTweet(Long id, String createdAt, Long userId, String username, String text, String detectedLanguage, Double languageConfidence, String NER, String sentiment, Double sentimentProbability, ArrayList<String> playersMentioned) {
         this.id = id;
@@ -64,7 +52,6 @@ public class EsTweet {
         this.text = text;
         this.detectedLanguage = detectedLanguage;
         this.languageConfidence = languageConfidence;
-        this.NER = NER;
         this.sentiment = sentiment;
         this.sentimentProbability = sentimentProbability;
         this.playersMentioned = playersMentioned;
