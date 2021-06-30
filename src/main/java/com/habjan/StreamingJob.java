@@ -22,13 +22,11 @@ import com.habjan.functions.*;
 import com.habjan.model.EsTweet;
 import com.habjan.model.Tweet;
 import com.habjan.model.TweetUtils;
-import opennlp.tools.doccat.DoccatFactory;
-import opennlp.tools.doccat.DoccatModel;
-import opennlp.tools.doccat.DocumentCategorizerME;
-import opennlp.tools.doccat.DocumentSampleStream;
+import opennlp.tools.doccat.*;
 import opennlp.tools.langdetect.Language;
 import opennlp.tools.langdetect.LanguageDetector;
 import opennlp.tools.langdetect.LanguageDetectorModel;
+import opennlp.tools.ml.naivebayes.NaiveBayesTrainer;
 import opennlp.tools.namefind.TokenNameFinderModel;
 import opennlp.tools.tokenize.TokenizerModel;
 import opennlp.tools.util.*;
@@ -65,11 +63,11 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class StreamingJob {
 
-    public static String TOPIC_NAME = "tweets_uclfinal";
+    public static String TOPIC_NAME = "tweets_engger";
     public static Boolean WINDOWED = false;
     public static final int WINDOW_DURATION = 120;
     public static final int WINDOW_SLIDE = 10;
-    public static String ES_INDEX_NAME = "tweets_engcro";
+    public static String ES_INDEX_NAME = "tweets_engger";
     public static ArrayList<String> PLAYERS = new ArrayList<String>();
 
     private static TokenizerModel tokenizerModel;
@@ -95,6 +93,8 @@ public class StreamingJob {
         TrainModel();
         ReadPlayersSpecific("eng-cro-players.txt");
 
+        System.out.println(Arrays.toString(PLAYERS.toArray()));
+
 
         FlinkKafkaConsumerBase<Tweet> kafkaData = new FlinkKafkaConsumer<Tweet>(
                 TOPIC_NAME,
@@ -115,7 +115,7 @@ public class StreamingJob {
                 .filter(new FilterRetweetsFunction())
                 .map(new LanguageRecognitionFunction(languageModel))
                 .map(new NamedEntityRecognitionFunction(nerPersonModel, tokenizerModel, PLAYERS))
-                .map(new SentimentCategorizerFunction(doccatModel))
+                .map(new SentimentCategorizerFunction(doccatModel, tokenizerModel))
                 .addSink(ESsinkBuilder().build());
                 //.print();
 
@@ -176,11 +176,15 @@ public class StreamingJob {
     }
 
     public static void CsvSentimentTraining(DataStream<EsTweet> stream){
-        stream.filter(new FilterFunction<EsTweet>() {
+        stream.map(new LanguageRecognitionFunction(languageModel))
+        .filter(new FilterFunction<EsTweet>() {
             @Override
             public boolean filter(EsTweet tweet) throws Exception {
-                int rand = ThreadLocalRandom.current().nextInt(0, 533000);
-                return rand < 500 ? true : false;
+                if(!tweet.getDetectedLanguage().equals("eng") || tweet.getText().toLowerCase().startsWith("rt")) return false;
+                else{
+                    int rand = ThreadLocalRandom.current().nextInt(0, 187000);
+                    return rand < 500 ? true : false;
+                }
             }
         }).map(new MapFunction<EsTweet, Tuple2<String, String>>() {
             @Override
@@ -196,7 +200,7 @@ public class StreamingJob {
                 if (stringStringTuple2.f1.startsWith("rt")) return false;
                 else return true;
             }
-        }).writeAsCsv("file:///home/anze/csv/sentimenttraining.csv");
+        }).writeAsCsv("file:///home/anze/csv/sentimenttraining2.csv");
     }
 
     public static void WindowedStreamingJob(DataStream<Tweet> stream) {
@@ -247,7 +251,7 @@ public class StreamingJob {
         try {
             dataIn = new InputStreamFactory() {
                 public InputStream createInputStream() throws IOException {
-                    return StreamingJob.class.getResourceAsStream("/sentiment-training-model.txt");
+                    return StreamingJob.class.getResourceAsStream("/sentiment-training-model2.txt");
                 }
             };
             ObjectStream lineStream = new PlainTextByLineStream(dataIn, "UTF-8");
@@ -255,7 +259,11 @@ public class StreamingJob {
             // Specifies the minimum number of times a feature must be seen
             //int cutoff = 2;
             //int trainingIterations = 30;
-            doccatModel = DocumentCategorizerME.train("en", sampleStream, TrainingParameters.defaultParams(), new DoccatFactory());
+            TrainingParameters trainingParameters = new TrainingParameters();
+            trainingParameters.put(TrainingParameters.CUTOFF_PARAM, 2);
+            trainingParameters.put(TrainingParameters.ITERATIONS_PARAM, 10);
+            trainingParameters.put(TrainingParameters.ALGORITHM_PARAM, NaiveBayesTrainer.NAIVE_BAYES_VALUE);
+            doccatModel = DocumentCategorizerME.train("en", sampleStream, trainingParameters, new DoccatFactory(new FeatureGenerator[]{new BagOfWordsFeatureGenerator()}));
         } catch (IOException e) {
             System.out.println("Sentiment training data error");
             e.printStackTrace();
@@ -291,7 +299,11 @@ public class StreamingJob {
                      new BufferedReader(inputStreamReader)) {
             while((line = br.readLine()) != null){
                 String player = StringUtils.substringBetween(line,":","(");
-                PLAYERS.add(player.trim());
+                player = player.trim();
+                if(player.endsWith(",")){
+                    player = StringUtils.substring(player, 0, player.length() - 1);
+                }
+                PLAYERS.add(player);
             }
         } catch (Exception e){
             System.out.println(e);
@@ -305,6 +317,9 @@ public class StreamingJob {
             }
             if (i == 1) {
                 TOPIC_NAME = args[i];
+            }
+            if(i == 2){
+                ES_INDEX_NAME = args[i];
             }
         }
     }
