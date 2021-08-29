@@ -63,11 +63,11 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class StreamingJob {
 
-    public static String TOPIC_NAME = "tweets_engger";
+    public static String TOPIC_NAME = "tweets_engita";
     public static Boolean WINDOWED = false;
     public static final int WINDOW_DURATION = 120;
     public static final int WINDOW_SLIDE = 10;
-    public static String ES_INDEX_NAME = "tweets_engger";
+    public static String ES_INDEX_NAME = "tweets_engita_dup";
     public static ArrayList<String> PLAYERS = new ArrayList<String>();
 
     private static TokenizerModel tokenizerModel;
@@ -83,7 +83,7 @@ public class StreamingJob {
         ParseArgs(args);
 
         Properties properties = new Properties();
-        properties.setProperty("bootstrap.servers", "localhost:9092");
+        properties.setProperty("bootstrap.servers", "broker2:29092");
         properties.setProperty("group.id", "com.habjan");
 
 
@@ -98,7 +98,7 @@ public class StreamingJob {
 
         FlinkKafkaConsumerBase<Tweet> kafkaData = new FlinkKafkaConsumer<Tweet>(
                 TOPIC_NAME,
-                ConfluentRegistryAvroDeserializationSchema.forSpecific(Tweet.class, "http://localhost:8081"),
+                ConfluentRegistryAvroDeserializationSchema.forSpecific(Tweet.class, "http://schema-registry2:8081"),
                 properties).setStartFromEarliest();
 
         //If windowed stream assign timestamp and watermark
@@ -116,8 +116,8 @@ public class StreamingJob {
                 .map(new LanguageRecognitionFunction(languageModel))
                 .map(new NamedEntityRecognitionFunction(nerPersonModel, tokenizerModel, PLAYERS))
                 .map(new SentimentCategorizerFunction(doccatModel, tokenizerModel))
-                .addSink(ESsinkBuilder().build());
-                //.print();
+                //.addSink(ESsinkBuilder().build());
+                .print();
 
         //LEICESTER NEWCASTLE: 1620412200000L
         //ARSENAL CHELSEA: 1619990100000L
@@ -148,7 +148,7 @@ public class StreamingJob {
         //CsvSentimentTraining(esStream);
         /*----------------------------------------------------------------------------*/
 
-        env.execute("Flink Streaming Java API Skeleton");
+        env.execute("Football tweets analysis");
     }
 
     public static void CsvStreamingJob(DataStream<Tweet> stream, long endTimeStamp) {
